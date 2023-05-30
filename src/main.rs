@@ -27,6 +27,12 @@ enum GameUpdate {
     Tick,
 }
 
+enum GameOver {
+    LockOut,
+    BlockOut,
+    TopOut,
+}
+
 #[derive(Debug, Copy, Clone)]
 struct Point {
     x: i32,
