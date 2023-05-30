@@ -229,6 +229,18 @@ impl Piece {
             }
         }
     }
+
+    fn is_below_skyline(&self) -> bool {
+        let mut below = false;
+        self.each_point(&mut |row, _| {
+            let y = row as u32;
+            if y < BOARD_HEIGHT {
+                below = true;
+            }
+        });
+
+        below
+    }
 }
 
 /// Implements a queue of randomized tetrominoes.
@@ -409,11 +421,14 @@ impl Game {
     fn advance_game(&mut self) -> bool {
         if !self.move_piece(0, 1) {
             self.board.lock_piece(&self.piece, self.piece_position);
+            if !self.piece.is_below_skyline() {
+                panic!("Lock Out");
+            }
             self.board.clear_lines();
             self.piece = self.piece_bag.pop();
 
             if !self.place_new_piece() {
-                return false;
+                panic!("Block Out");
             }
         }
 
