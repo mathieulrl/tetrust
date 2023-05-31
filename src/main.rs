@@ -307,6 +307,8 @@ struct Game {
     piece_bag: PieceBag,
     piece: Piece,
     piece_position: Point,
+    level: u32,
+    lines_cleared: u32,
 }
 
 impl Game {
@@ -318,13 +320,20 @@ impl Game {
             board: Board{
                 cells: [[None; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize]
             },
-            piece_bag: piece_bag,
-            piece: piece,
-            piece_position: Point{ x: 0, y: 0 }
+            piece_bag,
+            piece,
+            piece_position: Point{ x: 0, y: 0 },
+            level: 1,
+            lines_cleared: 0,
         };
 
         game.place_new_piece();
         game
+    }
+
+    // Called every time we cleared lines and update level accordingly
+    fn update_level(&self) -> u32 {
+        (self.lines_cleared / 10) + 1
     }
 
     /// Returns the new position of the current piece if it were to be dropped.
@@ -344,7 +353,13 @@ impl Game {
 
         // Render the level
         let left_margin = BOARD_WIDTH * 2 + 5;
-        display.set_text("Level: 1", left_margin, 3, Color::Red, Color::Black);
+        let level = format!("Level: {}", self.level);
+        display.set_text(&level, left_margin, 3, Color::Red, Color::Black);
+
+        // Render the lines cleared
+        let left_margin = BOARD_WIDTH * 2 + 5;
+        let lines = format!("Lines cleared: {}", self.lines_cleared);
+        display.set_text(&lines, left_margin, 4, Color::Red, Color::Black);
 
         // Render the currently falling piece
         let x = 1 + (2 * self.piece_position.x);
@@ -424,7 +439,8 @@ impl Game {
             if !self.piece.is_below_skyline() {
                 panic!("Lock Out");
             }
-            self.board.clear_lines();
+            self.lines_cleared += self.board.clear_lines();
+            self.level = self.update_level();
             self.piece = self.piece_bag.pop();
 
             if !self.place_new_piece() {
