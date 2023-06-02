@@ -309,6 +309,7 @@ struct Game {
     piece_position: Point,
     level: u32,
     lines_cleared: u32,
+    score: u32,
 }
 
 impl Game {
@@ -325,6 +326,7 @@ impl Game {
             piece_position: Point{ x: 0, y: 0 },
             level: 1,
             lines_cleared: 0,
+            score: 0,
         };
 
         game.place_new_piece();
@@ -360,6 +362,11 @@ impl Game {
         let left_margin = BOARD_WIDTH * 2 + 5;
         let lines = format!("Lines cleared: {}", self.lines_cleared);
         display.set_text(&lines, left_margin, 4, Color::Red, Color::Black);
+
+        // Render the score
+        let left_margin = BOARD_WIDTH * 2 + 5;
+        let score = format!("score: {}", self.score);
+        display.set_text(&score, left_margin, 5, Color::Red, Color::Black);
 
         // Render the currently falling piece
         let x = 1 + (2 * self.piece_position.x);
@@ -430,6 +437,18 @@ impl Game {
         }
     }
 
+    // Update the score according to current level, number of lines cleared
+    fn update_score(&mut self, cleared_lines: u32) {
+        match cleared_lines {
+            0 => {}, // Shouldn't happen, but just in case
+            1 => self.score += 100 * self.level,
+            2 => self.score += 300 * self.level,
+            3 => self.score += 500 * self.level,
+            4 => self.score += 800 * self.level,
+            _ => unreachable!()
+        }
+    }
+
     /// Advances the game by moving the current piece down one step. If the piece cannot move down, the piece
     /// is locked and the game is set up to drop the next piece.  Returns true if the game could be advanced,
     /// false if the player has lost.
@@ -439,8 +458,17 @@ impl Game {
             if !self.piece.is_below_skyline() {
                 panic!("Lock Out");
             }
-            self.lines_cleared += self.board.clear_lines();
-            self.level = self.update_level();
+
+            // Did we cleared any lines?
+            let cleared_lines = self.board.clear_lines();
+            if cleared_lines > 0 {
+                self.lines_cleared += cleared_lines;
+
+                // We update the score before leveling up
+                self.update_score(cleared_lines);
+                self.level = self.update_level();
+            }
+
             self.piece = self.piece_bag.pop();
 
             if !self.place_new_piece() {
