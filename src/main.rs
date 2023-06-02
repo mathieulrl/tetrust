@@ -310,6 +310,7 @@ struct Game {
     level: u32,
     lines_cleared: u32,
     score: u32,
+    drops: u32,
 }
 
 impl Game {
@@ -327,6 +328,7 @@ impl Game {
             level: 1,
             lines_cleared: 0,
             score: 0,
+            drops: 0,
         };
 
         game.place_new_piece();
@@ -469,6 +471,10 @@ impl Game {
                 self.level = self.update_level();
             }
 
+            // Add the drop bonus
+            self.score += self.drops;
+            self.drops = 0;
+
             self.piece = self.piece_bag.pop();
 
             if !self.place_new_piece() {
@@ -482,7 +488,14 @@ impl Game {
     /// Drops the current piece to the lowest spot on the board where it fits without collisions and
     /// advances the game.
     fn drop_piece(&mut self) -> bool {
-        while self.move_piece(0, 1) {}
+        while self.move_piece(0, 1) {
+            self.drops += 2;
+        }
+        self.advance_game()
+    }
+
+    fn soft_drop(&mut self) -> bool {
+        self.drops += 1;
         self.advance_game()
     }
 
@@ -490,7 +503,7 @@ impl Game {
         match key {
             Key::Left => self.move_piece(-1, 0),
             Key::Right => self.move_piece(1, 0),
-            Key::Down => self.advance_game(),
+            Key::Down => self.soft_drop(),
             Key::Up => self.rotate_piece(Direction::Left),
             Key::Space => self.drop_piece(),
             Key::Char('q') => self.rotate_piece(Direction::Left),
