@@ -400,3 +400,41 @@ fn main() {
 }
 ```
 
+It's also possible to define constraints on the types that can implement a trait, generally by specifying some other traits that it must implement first (this is known as trait bound).
+
+```rust
+trait Shape {
+    fn area(&self) -> f64;
+}
+
+trait Draw {
+    fn draw(&self);
+}
+
+// We declare that we will implement Draw for types T that already implement Shape.
+impl<T: Shape> Draw for T {
+    fn draw(&self) {
+        println!("Drawing a shape with area: {}", self.area());
+    }
+}
+
+struct Circle {
+    radius: f64,
+}
+
+// Implement the Shape trait for Circle
+impl Shape for Circle {
+    fn area(&self) -> f64 {
+        3.14159 * self.radius * self.radius
+    }
+}
+
+fn main() {
+    let my_circle = Circle { radius: 2.0 };
+
+    // Because Circle implements Shape, it also now implements Draw
+    my_circle.draw(); // This will print: "Drawing a shape with area: 12.56636"
+}
+```
+
+You certainly noticed that we didn't implement `Draw`, it comes for free as we implemented `Shape`. This is called blanket implementation.
