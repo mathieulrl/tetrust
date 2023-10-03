@@ -8,6 +8,7 @@ use std::sync::mpsc;
 use std::time::Duration;
 use util::*;
 
+
 const BOARD_WIDTH: u32 = 10;
 const BOARD_HEIGHT: u32 = 20;
 const HIDDEN_ROWS: u32 = 2;
@@ -27,6 +28,24 @@ enum GameUpdate {
     Tick,
 }
 
+enum GameOver {
+    LockOut,
+    BlockOut,
+    TopOut,
+}
+
+impl GameOver {
+    fn description(&self) -> &str {
+        match self {
+            GameOver::LockOut => panic!("The pieces are locked and cannot move."),
+            GameOver::BlockOut => panic!("The playfield is completely blocked with pieces."),
+            GameOver::TopOut => panic!("The pieces have reached the top of the playfield."),
+        }
+    }
+}
+
+
+
 #[derive(Debug, Copy, Clone)]
 struct Point {
     x: i32,
@@ -35,6 +54,7 @@ struct Point {
 
 struct Board {
     cells: [[Option<Color>; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize],
+
 }
 
 impl Board {
@@ -48,16 +68,16 @@ impl Board {
         }
         for row in 0..BOARD_HEIGHT {
             for col in 0..BOARD_WIDTH {
-                match self.cells[row as usize][col as usize] {
-                    Some(color) => {
-                        let c = 1 + (col * 2);
-                        display.set_text(" ", c, row, color, color);
-                        display.set_text(" ", c + 1, row, color, color);
-                    },
-                    None => ()
+                if let Some(color) = self.cells[row as usize][col as usize] {
+                    let c = 1 + (col * 2);
+                    display.set_text(" ", c, row, color, color);
+                    display.set_text(" ", c + 1, row, color, color);
                 }
             }
         }
+
+       
+    
     }
 
     pub fn lock_piece(&mut self, piece: &Piece, origin: Point) {
@@ -291,6 +311,9 @@ struct Game {
     piece_bag: PieceBag,
     piece: Piece,
     piece_position: Point,
+    score: u32,
+    level: u32,       
+    total_lines: u32, 
 }
 
 impl Game {
@@ -304,12 +327,19 @@ impl Game {
             },
             piece_bag: piece_bag,
             piece: piece,
-            piece_position: Point{ x: 0, y: 0 }
+            piece_position: Point{ x: 0, y: 0 },
+            level: 0,           
+            score: 0,          
+            total_lines: 0,    
         };
+
+        
 
         game.place_new_piece();
         game
     }
+
+
 
     /// Returns the new position of the current piece if it were to be dropped.
     fn find_dropped_position(&self) -> Point {
@@ -329,6 +359,27 @@ impl Game {
         // Render the level
         let left_margin = BOARD_WIDTH * 2 + 5;
         display.set_text("Level: 1", left_margin, 3, Color::Red, Color::Black);
+        
+        // Define left_margin before using it
+        //let left_margin = BOARD_WIDTH * 2 + 5;
+
+ 
+
+       /* // Create strings as owned `String` instances
+        let level_text = format!("Level: {}", self.level);
+        let score_text = format!("Score: {}", self.score);
+        let lines_cleared_text = format!("Lines Cleared: {}", self.total_lines);
+
+        // Render the level
+        display.set_text(&level_text, left_margin, 3, Color::Red, Color::Black);
+
+        // Render the score
+        display.set_text(&score_text, left_margin, 4, Color::Red, Color::Black);
+
+        // Render the lines cleared
+        display.set_text(&lines_cleared_text, left_margin, 5, Color::Red, Color::Black);
+                        
+*/
 
         // Render the currently falling piece
         let x = 1 + (2 * self.piece_position.x);
@@ -405,12 +456,46 @@ impl Game {
     fn advance_game(&mut self) -> bool {
         if !self.move_piece(0, 1) {
             self.board.lock_piece(&self.piece, self.piece_position);
-            self.board.clear_lines();
+
+            let lines_cleared = self.board.clear_lines();
+            if lines_cleared > 0 {
+                // Update the score based on the number of lines cleared
+                self.score += match lines_cleared {
+                    1 => 40,   // Scoring for clearing one line
+                    2 => 100,  // Scoring for clearing two lines
+                    3 => 300,  // Scoring for clearing three lines
+                    4 => 1200, // Scoring for clearing four lines 
+                    _ => 0,    // Default scoring for other cases
+                };
+
+            }
+
+            self.total_lines += lines_cleared;
+
+            if lines_cleared > 0 && self.total_lines >= self.level * 10 {
+                // Level up every 10 lines cleared
+                self.level += 1;
+            }
+
+
             self.piece = self.piece_bag.pop();
 
             if !self.place_new_piece() {
-                return false;
+
+                if self.piece_position.y <= HIDDEN_ROWS as i32 {
+                    GameOver::TopOut.description();
+                    return false;
+                } else if self.board.collision_test(&self.piece, self.piece_position) {
+                    GameOver::LockOut.description();
+                    return false;
+                } else {
+                    GameOver::BlockOut.description();
+                    return false;
+                }
+
+                
             }
+
         }
 
         true

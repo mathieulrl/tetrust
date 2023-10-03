@@ -68,7 +68,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust_course"
+name = "tetrust"
 version = "0.1.0"
 dependencies = [
  "libc 0.1.12",
