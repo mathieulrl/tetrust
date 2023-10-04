@@ -1,5 +1,9 @@
 ## struct
 
+### References
+
+* [Rust book](https://doc.rust-lang.org/book/ch05-00-structs.html)
+
 A struct is a composite data type that allows you to define your own custom data structure by combining different types into a single unit. It is similar to a struct in C or a class in other languages.
 
 To define a struct in Rust, you use the `struct` keyword followed by the name of the struct and a block that contains the fields of the struct. Each field is defined with a name and its corresponding type. Here's an example:
@@ -84,6 +88,10 @@ Note that each member of `Game` is also a struct which implements its own method
 
 ## enum
 
+### References
+
+* [Rust book](https://doc.rust-lang.org/book/ch06-00-enums.html)
+
 An enum, short for "enumeration," is a data type in Rust that represents a fixed set of possible values. It allows you to define a type by enumerating its variants, each of which can have different data associated with it. Enums are a powerful tool for expressing concepts that have a distinct set of possible states or options.
 
 In Rust, an enum is defined using the `enum` keyword, followed by the name of the enum and a list of its variants. Here's a [simple example]():
@@ -155,6 +163,11 @@ fn main() {
 Exercice: Write a new enum with all the game over conditions (`LockOut`, `BlockOut`, `TopOut`).
 
 ## Option and Result
+
+### References
+
+* [Result in the Book](https://doc.rust-lang.org/book/ch09-02-recoverable-errors-with-result.html)
+* [Options in Rust by examples](https://doc.rust-lang.org/rust-by-example/std/option.html)
 
 Both are enums with 2 variants:
 
@@ -251,6 +264,10 @@ Exercice: Rewrite all the `match ... { Some() => ..., None => ... }` in the code
 
 ## Iterators
 
+### Reference
+
+* [Iterators in the Book](https://doc.rust-lang.org/book/ch13-02-iterators.html)
+
 Iterators provide a uniform interface for traversing and processing elements within a collection. It represents a sequence of elements that can be iterated over, and abstracts away the details of accessing elements and provides useful methods for transformation and manipulation. 
 
 Iterators follow the iterator pattern, which consists of two main traits: `Iterator` and `IntoIterator`.
@@ -298,6 +315,11 @@ fn clear_lines(&mut self) -> u32 {
 Here `any()` returns `true` if any element in the iterator satisfies the condition expressed in the closure.
 
 ## What's a trait?
+
+### References
+
+* [in the Book](https://doc.rust-lang.org/book/ch10-02-traits.html)
+* [supertrait in the Book](https://doc.rust-lang.org/book/ch19-03-advanced-traits.html#using-supertraits-to-require-one-traits-functionality-within-another-trait)
 
 A trait is set of shared methods between different types, that usually implement them differently. 
 
@@ -399,6 +421,8 @@ fn main() {
     draw_shape(&rectangle);
 }
 ```
+
+### Trait bound
 
 It's also possible to define constraints on the types that can implement a trait, generally by specifying some other traits that it must implement first (this is known as trait bound).
 

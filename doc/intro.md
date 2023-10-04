@@ -20,26 +20,22 @@
 
 **Week 3: Add Levels**
 
-**Week 5: Memory Management**
-   - Ownership, Borrowing, and Lifetimes
+**Week 4: Memory Management**
+   - Ownership, Borrowing
+   - Box
    - Reference Counting with Rc and Arc
+   - Lifetimes
 
-**Week 6: Generics**
+**Week 5: Generics**
    - Introduction to Generics
    - Using Generics in Functions, Structs, Enums, and Methods
 
-**Week 7: Lifetimes**
-   - Understanding Lifetimes
-   - Lifetime Annotations in Function Signatures
-   - Structs and Lifetimes
-   - Lifetimes in Methods
-
-**Week 8: Error Handling**
+**Week 6: Error Handling**
    - Understanding Rust's Error Handling Philosophy
    - The Result and Option Enums
    - The ? Operator and propagating errors
 
-**Week 9: Testing**
+**Week 7: Testing**
    - Writing Tests
    - Running Tests
    - Test Organization
