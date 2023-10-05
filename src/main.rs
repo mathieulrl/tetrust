@@ -48,13 +48,10 @@ impl Board {
         }
         for row in 0..BOARD_HEIGHT {
             for col in 0..BOARD_WIDTH {
-                match self.cells[row as usize][col as usize] {
-                    Some(color) => {
-                        let c = 1 + (col * 2);
-                        display.set_text(" ", c, row, color, color);
-                        display.set_text(" ", c + 1, row, color, color);
-                    },
-                    None => ()
+                if let Some(color) = self.cells[row as usize][col as usize] {
+                    let c = 1 + (col * 2);
+                    display.set_text(" ", c, row, color, color);
+                    display.set_text(" ", c + 1, row, color, color);
                 }
             }
         }
@@ -258,9 +255,10 @@ impl PieceBag {
 
     /// Returns a copy of the next piece in the queue.
     fn peek(&self) -> Piece {
-        match self.pieces.first() {
-            Some(p) => p.clone(),
-            None => panic!("No next piece in piece bag")
+        if let Some(p) = self.pieces.first() {
+            p.clone()
+        } else {
+            panic!("No next piece in piece bag");
         }
     }
 
@@ -458,9 +456,8 @@ impl Game {
                 let stdin = &mut std::io::stdin();
 
                 loop {
-                    match get_input(stdin) {
-                        Some(k) => tx_event.send(GameUpdate::KeyPress(k)).unwrap(),
-                        None => ()
+                    if let Some(k) = get_input(stdin) {
+                        tx_event.send(GameUpdate::KeyPress(k)).unwrap();
                     }
                 }
             });
