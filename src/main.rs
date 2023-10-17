@@ -28,6 +28,7 @@ enum GameUpdate {
     Tick,
 }
 
+//#[derive(PartialEq, Eq)]
 enum GameOver {
     LockOut,
     BlockOut,
@@ -333,7 +334,7 @@ impl Game {
             total_lines: 0,    
         };
 
-        
+
 
         game.place_new_piece();
         game
@@ -359,6 +360,8 @@ impl Game {
         // Render the level
         let left_margin = BOARD_WIDTH * 2 + 5;
         display.set_text("Level: 1", left_margin, 3, Color::Red, Color::Black);
+        let score_line = format!("Score: {}",self.score);
+        display.set_text(&score_line, left_margin, 4, Color::Red, Color::Black);
         
         // Define left_margin before using it
         //let left_margin = BOARD_WIDTH * 2 + 5;
@@ -429,6 +432,7 @@ impl Game {
 
         if self.board.collision_test(&new_piece, self.piece_position) {
             false
+            //GAME OVER
         } else {
             self.piece = new_piece;
             true
