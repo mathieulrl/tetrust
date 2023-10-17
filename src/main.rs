@@ -7,11 +7,14 @@ use std::thread;
 use std::sync::mpsc;
 use std::time::Duration;
 use util::*;
+use rand::seq::SliceRandom;
+
 
 const BOARD_WIDTH: u32 = 10;
 const BOARD_HEIGHT: u32 = 20;
 const HIDDEN_ROWS: u32 = 2;
 
+#[derive(PartialEq)]
 enum Key {
     Up,
     Down,
@@ -27,6 +30,25 @@ enum GameUpdate {
     Tick,
 }
 
+//#[derive(PartialEq, Eq)]
+enum GameOver {
+    LockOut,
+    BlockOut,
+    TopOut,
+}
+
+impl GameOver {
+    fn description(&self) -> &str {
+        match self {
+            GameOver::LockOut => panic!("The pieces are locked and cannot move."),
+            GameOver::BlockOut => panic!("The playfield is completely blocked with pieces."),
+            GameOver::TopOut => panic!("The pieces have reached the top of the playfield."),
+        }
+    }
+}
+
+
+
 #[derive(Debug, Copy, Clone)]
 struct Point {
     x: i32,
@@ -35,6 +57,7 @@ struct Point {
 
 struct Board {
     cells: [[Option<Color>; BOARD_WIDTH as usize]; BOARD_HEIGHT as usize],
+
 }
 
 impl Board {
@@ -48,16 +71,16 @@ impl Board {
         }
         for row in 0..BOARD_HEIGHT {
             for col in 0..BOARD_WIDTH {
-                match self.cells[row as usize][col as usize] {
-                    Some(color) => {
-                        let c = 1 + (col * 2);
-                        display.set_text(" ", c, row, color, color);
-                        display.set_text(" ", c + 1, row, color, color);
-                    },
-                    None => ()
+                if let Some(color) = self.cells[row as usize][col as usize] {
+                    let c = 1 + (col * 2);
+                    display.set_text(" ", c, row, color, color);
+                    display.set_text(" ", c + 1, row, color, color);
                 }
             }
         }
+
+       
+    
     }
 
     pub fn lock_piece(&mut self, piece: &Piece, origin: Point) {
@@ -235,13 +258,13 @@ impl Piece {
 /// avoid pathological cases where purely random generation provides the same piece type repeately in a row,
 /// or fails to provide a required piece for a very long time.
 struct PieceBag {
-    pieces: Vec<Piece>
+    pieces: [Option<Piece>;7] 
 }
 
 impl PieceBag {
     fn new() -> PieceBag {
         let mut p = PieceBag{
-            pieces: Vec::new()
+            pieces: [None, None, None, None, None, None, None]
         };
         p.fill_bag();
         p
@@ -249,16 +272,25 @@ impl PieceBag {
 
     /// Removes and returns the next piece in the queue.
     fn pop(&mut self) -> Piece {
-        let piece = self.pieces.remove(0);
-        if self.pieces.is_empty() {
+        if let Some(piece) = self.pieces[0].take() {
+            // Shift the remaining pieces to the front
+            for i in 0..(6) {
+                self.pieces[i] = self.pieces[i + 1].take();
+            }
+            // Fill the last slot with a new piece
+            if self.pieces[6].is_none() {
+                self.fill_bag();
+            }
+            piece.clone()
+        } else {
             self.fill_bag();
+            self.pop()
         }
-        piece
     }
 
     /// Returns a copy of the next piece in the queue.
     fn peek(&self) -> Piece {
-        match self.pieces.first() {
+        match &self.pieces[0] {
             Some(p) => p.clone(),
             None => panic!("No next piece in piece bag")
         }
@@ -266,24 +298,28 @@ impl PieceBag {
 
     /// Generates a random ordering of all possible pieces and adds them to the piece queue.
     fn fill_bag(&mut self) {
-        use rand::Rng;
+        //use rand::Rng;
 
-        let mut pieces: Vec<Piece> = vec![
-            Piece::new_o(),
-            Piece::new_l(),
-            Piece::new_j(),
-            Piece::new_t(),
-            Piece::new_s(),
-            Piece::new_z(),
-            Piece::new_i()
+        let mut pieces: [Option<Piece>;7] = [
+            Some(Piece::new_o()),
+            Some(Piece::new_l()),
+            Some(Piece::new_j()),
+            Some(Piece::new_t()),
+            Some(Piece::new_s()),
+            Some(Piece::new_z()),
+            Some(Piece::new_i())
         ];
 
         let mut rng = rand::thread_rng();
-        while !pieces.is_empty() {
-            let i = rng.gen::<usize>() % pieces.len();
-            self.pieces.push(pieces.swap_remove(i));
+        let mut indices: Vec<usize> = (0..7).collect();
+        indices.shuffle(&mut rng);
+    
+        for i in 0..7 {
+            if let Some(piece) = pieces[indices[i]].take() {
+                self.pieces[i] = Some(piece.clone());
+            }
         }
-    }
+}
 }
 
 struct Game {
@@ -291,6 +327,10 @@ struct Game {
     piece_bag: PieceBag,
     piece: Piece,
     piece_position: Point,
+    score: u32,
+    level: u32,       
+    total_lines: u32, 
+    game_over: bool,
 }
 
 impl Game {
@@ -304,12 +344,20 @@ impl Game {
             },
             piece_bag: piece_bag,
             piece: piece,
-            piece_position: Point{ x: 0, y: 0 }
+            piece_position: Point{ x: 0, y: 0 },
+            level: 0,           
+            score: 0,          
+            total_lines: 0,    
+            game_over: false,
         };
+
+
 
         game.place_new_piece();
         game
     }
+
+
 
     /// Returns the new position of the current piece if it were to be dropped.
     fn find_dropped_position(&self) -> Point {
@@ -321,6 +369,26 @@ impl Game {
         origin
     }
 
+    fn game_over_condition(&self) -> bool {
+        // If the game is already marked as game over, no need to check again
+        if self.game_over {
+            return true;
+        }
+    
+        // Check if a new piece cannot be placed
+        let new_piece = self.piece_bag.peek();
+        let origin = Point {
+            x: ((BOARD_WIDTH - (new_piece.shape.len() as u32)) / 2) as i32,
+            y: 0,
+        };
+        if self.board.collision_test(&new_piece, origin) {
+            return true;
+        }
+    
+        false
+    }
+
+
     /// Draws the game to the display.
     fn render(&self, display: &mut Display) {
         // Render the board
@@ -329,6 +397,29 @@ impl Game {
         // Render the level
         let left_margin = BOARD_WIDTH * 2 + 5;
         display.set_text("Level: 1", left_margin, 3, Color::Red, Color::Black);
+        let score_line = format!("Score: {}",self.score);
+        display.set_text(&score_line, left_margin, 4, Color::Red, Color::Black);
+        
+        // Define left_margin before using it
+        //let left_margin = BOARD_WIDTH * 2 + 5;
+
+ 
+
+       /* // Create strings as owned `String` instances
+        let level_text = format!("Level: {}", self.level);
+        let score_text = format!("Score: {}", self.score);
+        let lines_cleared_text = format!("Lines Cleared: {}", self.total_lines);
+
+        // Render the level
+        display.set_text(&level_text, left_margin, 3, Color::Red, Color::Black);
+
+        // Render the score
+        display.set_text(&score_text, left_margin, 4, Color::Red, Color::Black);
+
+        // Render the lines cleared
+        display.set_text(&lines_cleared_text, left_margin, 5, Color::Red, Color::Black);
+                        
+*/
 
         // Render the currently falling piece
         let x = 1 + (2 * self.piece_position.x);
@@ -343,6 +434,23 @@ impl Game {
         let next_piece = self.piece_bag.peek();
         self.render_piece(display, &next_piece, Point{ x: (left_margin as i32) + 2, y: 9 });
     }
+
+    fn display_game_over_screen(&self, display: &mut Display) {
+        display.clear_buffer();
+
+        // Render a game over message
+        display.set_text("Game Over!", 10, 10, Color::Red, Color::Black);
+
+        // Display the player's score
+        let score_text = format!("Your Score: {}", self.score);
+        display.set_text(&score_text, 10, 12, Color::Red, Color::Black);
+
+        // Prompt the player to restart or exit
+        display.set_text("Press 'R' to restart or 'Q' to quit.", 10, 14, Color::Red, Color::Black);
+
+        display.render();
+    }
+
 
     fn render_piece(&self, display: &mut Display, piece: &Piece, origin: Point) {
         let color = piece.color;
@@ -378,6 +486,7 @@ impl Game {
 
         if self.board.collision_test(&new_piece, self.piece_position) {
             false
+            //GAME OVER
         } else {
             self.piece = new_piece;
             true
@@ -405,12 +514,49 @@ impl Game {
     fn advance_game(&mut self) -> bool {
         if !self.move_piece(0, 1) {
             self.board.lock_piece(&self.piece, self.piece_position);
-            self.board.clear_lines();
+
+            let lines_cleared = self.board.clear_lines();
+            if lines_cleared > 0 {
+                // Update the score based on the number of lines cleared
+                self.score += match lines_cleared {
+                    1 => 40,   // Scoring for clearing one line
+                    2 => 100,  // Scoring for clearing two lines
+                    3 => 300,  // Scoring for clearing three lines
+                    4 => 1200, // Scoring for clearing four lines 
+                    _ => 0,    // Default scoring for other cases
+                };
+
+            self.total_lines += lines_cleared;
+
+            if lines_cleared > 0 && self.total_lines >= self.level * 10 {
+                // Level up every 10 lines cleared
+                self.level += 1;
+            }
+
+        }
+
+
             self.piece = self.piece_bag.pop();
 
             if !self.place_new_piece() {
-                return false;
+
+                if self.piece_position.y <= HIDDEN_ROWS as i32 {
+                    //GameOver::TopOut.description();
+                    self.game_over = true;
+                    return false;
+                } else if self.board.collision_test(&self.piece, self.piece_position) {
+                    //GameOver::LockOut.description();
+                    self.game_over = true;
+                    return false;
+                } else {
+                    //GameOver::BlockOut.description();
+                    self.game_over = true;
+                    return false;
+                }
+
+                
             }
+
         }
 
         true
@@ -442,10 +588,13 @@ impl Game {
 
         // Spawn a thread which sends periodic game ticks to advance the piece
         {
+            // Formula: speed (in milliseconds) = 1000 - (level * 50)
+            let level_speed = 1000 - (self.level * 50);
+
             let tx_event = tx_event.clone();
             thread::spawn(move || {
                 loop {
-                    thread::sleep(Duration::from_millis(500));
+                    thread::sleep(Duration::from_millis(level_speed.into()));
                     tx_event.send(GameUpdate::Tick).unwrap();
                 };
             });
@@ -468,27 +617,52 @@ impl Game {
 
         // Main game loop. The loop listens and responds to timer and keyboard updates received on a channel
         // as sent by the threads spawned above.
-        loop {
-            display.clear_buffer();
+loop {
+        display.clear_buffer();
+        if self.game_over {
+            self.display_game_over_screen(display);
+        } else {
             self.render(display);
-            display.render();
+        }
+        display.render();
 
-            match rx_event.recv() {
-                Ok(update) => {
-                    match update {
-                        GameUpdate::KeyPress(key) => {
+        match rx_event.recv() {
+            Ok(update) => {
+                match update {
+                    GameUpdate::KeyPress(key) => {
+                        if !self.game_over {
                             match key {
-                                Key::Char('z') | Key::CtrlC => break,
-                                k => { self.keypress(k); }
+                                Key::Char('z') | Key::CtrlC => {
+                                    if self.game_over {
+                                        break;
+                                    }
+                                }
+                                k => {
+                                    if self.game_over {
+                                        // If the game is over, pressing 'R' restarts the game
+                                        if k == Key::Char('r') {
+                                            *self = Game::new(); // Restart the game
+                                            self.game_over = false;
+                                            continue;
+                                        }
+                                    } else {
+                                        self.keypress(k);
+                                    }
+                                }
                             };
-                        },
-                        GameUpdate::Tick => { self.advance_game(); }
-                    };
-                },
-                Err(err) => panic!("{}", err)
+                        }
+                    }
+                    GameUpdate::Tick => {
+                        if !self.game_over {
+                            self.advance_game();
+                        }
+                    }
+                }
             }
+            Err(err) => panic!("{}", err),
         }
     }
+}
 }
 
 fn get_input(stdin: &mut std::io::Stdin) -> Option<Key> {
